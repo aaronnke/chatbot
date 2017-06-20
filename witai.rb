@@ -19,14 +19,26 @@ client = Wit.new(access_token: access_token, actions: actions)
 rsp = client.message(ARGV[0])
 entities = rsp['entities']
 intent = entities['intent'][0]['value'] if entities['intent']
+date_time = entities['datetime'] ? entities['datetime'][0]['value'].slice(0,19) : nil
+location = entities['location'][0]['value'].upcase if entities['location']
 
 reply = nil
 case intent
 when 'air_temperature'
   url = "https://api.data.gov.sg/v1/environment/air-temperature"
+  url += "?date_time=#{date_time}" if date_time
   data = HTTP.headers('api-key' => consumer_key).get(url)
   temp = data.parse['items'][0]['readings'][0]['value']
-  reply = "The temperature is #{temp}"
+  reply = "The temperature was #{temp} at #{date_time}"
+when 'weather'
+  url = "https://api.data.gov.sg/v1/environment/2-hour-weather-forecast"
+  url += "?date_time=#{date_time}" if date_time
+  data = HTTP.headers('api-key' => consumer_key).get(url).parse['items'][0]
+  start_time = data['valid_period']['start'].slice(0,19)
+  end_time = data['valid_period']['end'].slice(0,19)
+  index = data['forecasts'].index{ |loc| loc['area'].upcase == location }
+  forecast = data['forecasts'][index]['forecast']
+  reply = "The forecast for #{location} between #{start_time} and #{end_time} is #{forecast}"
 end
 
 puts reply
